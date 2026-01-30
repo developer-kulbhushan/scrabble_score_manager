@@ -9,9 +9,14 @@ import math
 app = FastAPI()
 
 # CORS configuration
+origins = [
+    "https://scrabble-score-manager-frontend.vercel.app",
+    "http://localhost:3000",   # optional for local dev
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:5173", "*"],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
