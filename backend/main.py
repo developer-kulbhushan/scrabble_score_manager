@@ -6,7 +6,7 @@ from uuid import UUID, uuid4
 from datetime import datetime, timezone
 import math
 import sqlite3
-from .database import init_db, get_db_connection
+from database import init_db, get_db_connection
 
 app = FastAPI()
 
