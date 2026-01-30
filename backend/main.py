@@ -12,6 +12,7 @@ app = FastAPI()
 origins = [
     "https://scrabble-score-manager-frontend.vercel.app",
     "http://localhost:3000",   # optional for local dev
+    "http://localhost:5173",
 ]
 
 app.add_middleware(
@@ -173,9 +174,6 @@ def get_game_state(game_id: UUID):
 @app.post("/games/{game_id}/turns")
 def submit_turn(game_id: UUID, req: SubmitTurnRequest):
     game = get_game(game_id)
-
-    if time_left(game) <= 0:
-        raise HTTPException(400, "Turn timer expired")
 
     team = current_team(game)
     player = team.players[0]

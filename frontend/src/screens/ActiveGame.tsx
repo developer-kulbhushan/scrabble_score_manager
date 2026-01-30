@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Trophy, Undo2, Timer, Star } from 'lucide-react';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
 import { Card } from '../components/Card';
 import { api } from '../utils/api';
+import { soundManager } from '../utils/sound';
 import { useGame } from '../context/GameContext';
 
 export function ActiveGame() {
@@ -26,6 +27,23 @@ export function ActiveGame() {
       setTimeLeft(gameState.current_turn.time_left);
     }
   }, [gameState]);
+
+  const prevTimeRef = useRef(timeLeft);
+
+  useEffect(() => {
+    const prevTime = prevTimeRef.current;
+    prevTimeRef.current = timeLeft;
+
+    if (prevTime > timeLeft) {
+      if (timeLeft <= 10 && timeLeft > 0) {
+        if (timeLeft % 2 === 0) soundManager.playTick();
+        else soundManager.playTock();
+      }
+      if (timeLeft === 0) {
+        soundManager.playAlarm();
+      }
+    }
+  }, [timeLeft]);
 
   useEffect(() => {
     if (timeLeft > 0) {
@@ -332,7 +350,7 @@ export function ActiveGame() {
               variant="success"
               size="lg"
               onClick={handleSubmitTurn}
-              disabled={loading || !baseScore || timeLeft <= 0}
+              disabled={loading || !baseScore}
               className="flex-1"
             >
               Submit Turn
