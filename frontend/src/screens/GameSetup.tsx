@@ -15,14 +15,14 @@ export function GameSetup() {
   const [gameName, setGameName] = useState('');
   const [turnDuration, setTurnDuration] = useState('60');
   const [teams, setTeams] = useState<TeamState[]>([
-    { id: '1', name: '', players: [''] },
-    { id: '2', name: '', players: [''] },
+    { id: '1', name: 'Team 1', players: [''] },
+    { id: '2', name: 'Team 2', players: [''] },
   ]);
   const [errors, setErrors] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
 
   const addTeam = () => {
-    setTeams([...teams, { id: Date.now().toString(), name: '', players: [''] }]);
+    setTeams([...teams, { id: Date.now().toString(), name: `Team ${teams.length + 1}`, players: [''] }]);
   };
 
   const removeTeam = (teamId: string) => {
