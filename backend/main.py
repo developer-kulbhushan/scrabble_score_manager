@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from uuid import UUID, uuid4
 from datetime import datetime, timezone
 import math
@@ -56,6 +56,19 @@ class SubmitTurnRequest(BaseModel):
     base_score: int
     bingo: bool
 
+class PlayerStats(BaseModel):
+    player_id: str
+    name: str
+    number: str
+    total_games: int
+    wins: int
+    win_rate: float
+    avg_score: float
+    high_score_solo: int
+    high_score_duo: int
+    high_score_trio: int
+    high_score_group: int # >3 players
+
 # --------------------
 # Helpers
 # --------------------
@@ -94,13 +107,11 @@ def calculate_time_left(turn_started_at_iso: Optional[str], turn_duration: int) 
     if not turn_started_at_iso:
         return turn_duration
 
-    # SQLite stores timestamps as strings usually, verify format
     try:
         started_at = datetime.fromisoformat(turn_started_at_iso)
         if started_at.tzinfo is None:
             started_at = started_at.replace(tzinfo=timezone.utc)
     except ValueError:
-        # Handle cases where format might vary or if it's already a datetime object (unlikely from raw sqlite row)
         return 0
 
     elapsed = (now() - started_at).total_seconds()
@@ -114,7 +125,6 @@ def calculate_time_left(turn_started_at_iso: Optional[str], turn_duration: int) 
 def search_players(query: Optional[str] = None):
     conn = get_db_connection()
     if query:
-        # Search by name or number
         wildcard = f"%{query}%"
         players = conn.execute(
             "SELECT * FROM players WHERE name LIKE ? OR number LIKE ?",
@@ -129,7 +139,6 @@ def search_players(query: Optional[str] = None):
 def register_player(req: PlayerCreate):
     conn = get_db_connection()
     try:
-        # Check if exists
         existing = conn.execute(
             "SELECT * FROM players WHERE name = ? AND number = ?",
             (req.name, req.number)
@@ -154,6 +163,71 @@ def register_player(req: PlayerCreate):
     finally:
         conn.close()
 
+@app.get("/stats/players/{player_id}", response_model=PlayerStats)
+def get_player_stats(player_id: str):
+    conn = get_db_connection()
+    try:
+        player = conn.execute("SELECT * FROM players WHERE id = ?", (player_id,)).fetchone()
+        if not player:
+            raise HTTPException(404, "Player not found")
+
+        # Get all games/teams this player participated in
+        # We need teams where player was involved, and the game must be finished
+        rows = conn.execute("""
+            SELECT g.id as game_id, t.id as team_id, t.score as team_score,
+                   (SELECT COUNT(*) FROM game_players gp2 WHERE gp2.team_id = t.id) as team_size,
+                   (SELECT MAX(t2.score) FROM teams t2 WHERE t2.game_id = g.id) as winning_score
+            FROM game_players gp
+            JOIN teams t ON gp.team_id = t.id
+            JOIN games g ON t.game_id = g.id
+            WHERE gp.player_id = ? AND g.status = 'finished'
+        """, (player_id,)).fetchall()
+
+        total_games = len(rows)
+        wins = 0
+        total_score = 0
+
+        high_score_solo = 0
+        high_score_duo = 0
+        high_score_trio = 0
+        high_score_group = 0
+
+        for row in rows:
+            score = row['team_score']
+            total_score += score
+            if score == row['winning_score'] and score > 0: # Tie counts as win? Yes.
+                 wins += 1
+
+            size = row['team_size']
+            if size == 1:
+                high_score_solo = max(high_score_solo, score)
+            elif size == 2:
+                high_score_duo = max(high_score_duo, score)
+            elif size == 3:
+                high_score_trio = max(high_score_trio, score)
+            else:
+                high_score_group = max(high_score_group, score)
+
+        avg_score = total_score / total_games if total_games > 0 else 0
+        win_rate = (wins / total_games * 100) if total_games > 0 else 0
+
+        return {
+            "player_id": player['id'],
+            "name": player['name'],
+            "number": player['number'],
+            "total_games": total_games,
+            "wins": wins,
+            "win_rate": round(win_rate, 1),
+            "avg_score": round(avg_score, 1),
+            "high_score_solo": high_score_solo,
+            "high_score_duo": high_score_duo,
+            "high_score_trio": high_score_trio,
+            "high_score_group": high_score_group
+        }
+
+    finally:
+        conn.close()
+
 @app.get("/history")
 def get_history():
     conn = get_db_connection()
@@ -161,16 +235,32 @@ def get_history():
 
     history = []
     for g in games:
-        # Get winner
         teams = conn.execute("SELECT * FROM teams WHERE game_id = ? ORDER BY score DESC", (g['id'],)).fetchall()
         winner = teams[0]['name'] if teams else "Unknown"
         top_score = teams[0]['score'] if teams else 0
 
+        # Get players for the winning team just for display? Or maybe all teams?
+        # The history API was basic. Let's keep it basic but maybe add winner details if needed.
+        # But previous code didn't ask for player names in history list specifically, but point 7 says:
+        # "metrics shown on the front page, and along with the team name, player names should also be mentioned"
+        # I should probably update history to return player names for the winner at least.
+
+        winner_players = []
+        if teams:
+             winner_team_id = teams[0]['id']
+             wp_rows = conn.execute("""
+                SELECT p.name FROM players p
+                JOIN game_players gp ON p.id = gp.player_id
+                WHERE gp.team_id = ?
+             """, (winner_team_id,)).fetchall()
+             winner_players = [r['name'] for r in wp_rows]
+
         history.append({
             "game_id": g['id'],
-            "name": g.get('name', 'Untitled Game'), # Assuming 'name' column exists in games table, if not added, need to check DB schema. I added it in step 1.
+            "name": g['name'],
             "ended_at": g['ended_at'],
             "winner": winner,
+            "winner_players": winner_players, # Added field
             "top_score": top_score,
             "teams_count": len(teams)
         })
@@ -180,15 +270,6 @@ def get_history():
 @app.post("/games")
 def create_game(req: CreateGameRequest):
     conn = get_db_connection()
-
-    # Check for active game? The requirement doesn't strictly forbid multiple games now that we have DB,
-    # but the UI might. The previous code did:
-    # "Another game already active" check.
-    # Since we are moving to persistent DB, supporting multiple games is fine,
-    # but for "pass and play" on a single screen, maybe we stick to one active game logic
-    # OR we just let the UI manage which ID it is looking at.
-    # I'll remove the restriction to allow historical data alongside new games.
-
     game_id = str(uuid4())
     try:
         conn.execute(
@@ -225,30 +306,12 @@ def get_game_state(game_id: str):
         teams = get_teams_from_db(conn, game_id)
         turns = get_turns_from_db(conn, game_id)
 
-        # Calculate current turn
         if game['status'] == 'finished':
             current_turn_info = None
         else:
             current_team_idx = game['current_turn_index'] % len(teams)
             current_team = teams[current_team_idx]
 
-            # Identify current player within team
-            # We need to rotate players within the team too?
-            # Previous logic: "player": team.players[0] -> it just took the first player.
-            # Usually scrabble rotates players.
-            # If a team has multiple players, do they alternate?
-            # The original code just said `player = team.players[0]`.
-            # I will stick to that for now, or maybe rotate if I can deduce it.
-            # But the 'turns' are per team.
-            # Let's assume the first player is the representative for now unless we track player-turns specifically.
-            # Wait, `game_players` links multiple players.
-            # If I want to be smart:
-            # count how many turns this team has taken.
-            # team_turns = [t for t in turns if t['team_id'] == current_team['id']]
-            # player_idx = len(team_turns) % len(current_team['players'])
-            # current_player = current_team['players'][player_idx]
-
-            # Let's implement this rotation logic.
             team_turns_count = conn.execute(
                 "SELECT COUNT(*) FROM turns WHERE game_id = ? AND team_id = ?",
                 (game_id, current_team['id'])
@@ -278,7 +341,7 @@ def get_game_state(game_id: str):
                 {
                     "id": t['id'],
                     "name": t['name'],
-                    "players": [p['name'] for p in t['players']], # Flatten for frontend compatibility if needed, or update frontend
+                    "players": [p['name'] for p in t['players']],
                     "score": t['score']
                 }
                 for t in teams
@@ -299,7 +362,6 @@ def submit_turn(game_id: str, req: SubmitTurnRequest):
         current_team_idx = game['current_turn_index'] % len(teams)
         current_team = teams[current_team_idx]
 
-        # Determine player
         team_turns_count = conn.execute(
             "SELECT COUNT(*) FROM turns WHERE game_id = ? AND team_id = ?",
             (game_id, current_team['id'])
@@ -310,14 +372,11 @@ def submit_turn(game_id: str, req: SubmitTurnRequest):
 
         total_score = req.base_score + (50 if req.bingo else 0)
 
-        # Insert turn
         conn.execute(
             """INSERT INTO turns (turn_number, game_id, team_id, player_id, base_score, bingo, total_score, timestamp)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
             (
-                game['current_turn_index'] + 1, # using global turn index as turn number? or per game?
-                # The previous code used `len(game.turns) + 1`.
-                # Here `game['current_turn_index']` tracks total turns.
+                game['current_turn_index'] + 1,
                 game_id,
                 current_team['id'],
                 current_player['id'],
@@ -328,13 +387,11 @@ def submit_turn(game_id: str, req: SubmitTurnRequest):
             )
         )
 
-        # Update team score
         conn.execute(
             "UPDATE teams SET score = score + ? WHERE id = ?",
             (total_score, current_team['id'])
         )
 
-        # Update game
         conn.execute(
             "UPDATE games SET current_turn_index = current_turn_index + 1, turn_started_at = ? WHERE id = ?",
             (now(), game_id)
@@ -342,14 +399,10 @@ def submit_turn(game_id: str, req: SubmitTurnRequest):
 
         conn.commit()
 
-        # Return response similar to old API
-        # Need next turn info
-        # Re-fetch to be safe
         game = get_game_from_db(conn, game_id)
         next_team_idx = game['current_turn_index'] % len(teams)
         next_team = teams[next_team_idx]
 
-        # Calculate next player
         next_team_turns_count = conn.execute(
             "SELECT COUNT(*) FROM turns WHERE game_id = ? AND team_id = ?",
             (game_id, next_team['id'])
@@ -357,12 +410,6 @@ def submit_turn(game_id: str, req: SubmitTurnRequest):
         next_players_list = next_team['players']
         next_player_idx = next_team_turns_count % len(next_players_list)
         next_player_name = next_players_list[next_player_idx]['name']
-
-        leaderboard = sorted(
-             [{"team_id": t['id'], "name": t['name'], "score": t['score'] + (total_score if t['id'] == current_team['id'] else 0)} for t in teams],
-             key=lambda x: x['score'],
-             reverse=True
-        ) # Actually I updated DB so I should just re-fetch teams for leaderboard
 
         teams_refreshed = get_teams_from_db(conn, game_id)
         leaderboard = sorted(
@@ -373,7 +420,7 @@ def submit_turn(game_id: str, req: SubmitTurnRequest):
 
         return {
             "turn": {
-                "turn_number": game['current_turn_index'], # Note: this is the one just submitted
+                "turn_number": game['current_turn_index'],
                 "team_id": current_team['id'],
                 "player": current_player['name'],
                 "base_score": req.base_score,
@@ -397,7 +444,6 @@ def undo_last_turn(game_id: str):
     conn = get_db_connection()
     try:
         game = get_game_from_db(conn, game_id)
-        # Find last turn
         last_turn = conn.execute(
             "SELECT * FROM turns WHERE game_id = ? ORDER BY id DESC LIMIT 1",
             (game_id,)
@@ -406,16 +452,13 @@ def undo_last_turn(game_id: str):
         if not last_turn:
             raise HTTPException(400, "No turns to undo")
 
-        # Revert score
         conn.execute(
             "UPDATE teams SET score = score - ? WHERE id = ?",
             (last_turn['total_score'], last_turn['team_id'])
         )
 
-        # Delete turn
         conn.execute("DELETE FROM turns WHERE id = ?", (last_turn['id'],))
 
-        # Update game
         conn.execute(
             "UPDATE games SET current_turn_index = current_turn_index - 1, turn_started_at = ? WHERE id = ?",
             (now(), game_id)
@@ -423,13 +466,11 @@ def undo_last_turn(game_id: str):
 
         conn.commit()
 
-        # Construct response
-        game = get_game_from_db(conn, game_id) # re-fetch
+        game = get_game_from_db(conn, game_id)
         teams = get_teams_from_db(conn, game_id)
         current_team_idx = game['current_turn_index'] % len(teams)
         current_team = teams[current_team_idx]
 
-        # Player calculation
         team_turns_count = conn.execute(
             "SELECT COUNT(*) FROM turns WHERE game_id = ? AND team_id = ?",
             (game_id, current_team['id'])
@@ -439,7 +480,7 @@ def undo_last_turn(game_id: str):
         current_player_name = players_list[player_idx]['name']
 
         return {
-            "reverted_turn_number": last_turn['turn_number'], # Assuming this was stored
+            "reverted_turn_number": last_turn['turn_number'],
             "current_turn": {
                 "turn_number": game['current_turn_index'] + 1,
                 "team_id": current_team['id'],
@@ -465,7 +506,11 @@ def end_game(game_id: str):
         return {
             "status": "finished",
             "final_scores": [
-                {"team": t['name'], "score": t['score']} for t in scores
+                {
+                    "team": t['name'],
+                    "score": t['score'],
+                    "players": [p['name'] for p in t['players']] # Include players!
+                } for t in scores
             ],
             "winner": winner
         }

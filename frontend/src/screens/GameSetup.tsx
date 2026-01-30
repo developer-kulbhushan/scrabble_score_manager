@@ -16,7 +16,13 @@ interface TeamState {
 
 export function GameSetup() {
   const { setGameId, setCurrentScreen } = useGame();
-  const [gameName, setGameName] = useState('');
+
+  // Default name logic updated as per request
+  const [gameName, setGameName] = useState(() => {
+    const now = new Date();
+    return now.toLocaleString();
+  });
+
   const [turnDuration, setTurnDuration] = useState('60');
   const [teams, setTeams] = useState<TeamState[]>([
     { id: '1', name: 'Team 1', players: [] },
@@ -87,6 +93,7 @@ export function GameSetup() {
       newErrors.push('At least 2 teams are required');
     }
 
+    // Validation Check: all teams must have at least 1 player
     teams.forEach((team, index) => {
       if (!team.name.trim()) {
         newErrors.push(`Team ${index + 1} name is required`);
@@ -145,7 +152,7 @@ export function GameSetup() {
             <Input
               label="Game Name"
               type="text"
-              placeholder="Friday Night Scrabble"
+              placeholder="Game Name"
               value={gameName}
               onChange={(e) => setGameName(e.target.value)}
             />
@@ -197,7 +204,7 @@ export function GameSetup() {
 
                 <div className="space-y-2">
                   <label className="block text-sm font-medium text-gray-700">
-                    Players
+                    Players <span className="text-red-500">*</span>
                   </label>
 
                   <div className="space-y-2">
@@ -222,6 +229,9 @@ export function GameSetup() {
                     onSelect={(player) => addPlayerToTeam(team.id, player)}
                     onCreateNew={(name) => handleCreateNew(team.id, name)}
                   />
+                  {team.players.length === 0 && (
+                      <p className="text-xs text-amber-600">At least one player required.</p>
+                  )}
                 </div>
               </div>
             </Card>

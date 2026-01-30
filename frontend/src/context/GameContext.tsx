@@ -8,8 +8,8 @@ interface GameContextType {
   setGameId: (id: string | null) => void;
   setGameState: Dispatch<SetStateAction<GameState | null>>;
   setEndGameData: (data: EndGameResponse | null) => void;
-  currentScreen: 'home' | 'setup' | 'active' | 'gameover';
-  setCurrentScreen: (screen: 'home' | 'setup' | 'active' | 'gameover') => void;
+  currentScreen: 'home' | 'setup' | 'active' | 'gameover' | 'stats';
+  setCurrentScreen: (screen: 'home' | 'setup' | 'active' | 'gameover' | 'stats') => void;
 }
 
 const GameContext = createContext<GameContextType | undefined>(undefined);
@@ -20,7 +20,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
   });
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [endGameData, setEndGameData] = useState<EndGameResponse | null>(null);
-  const [currentScreen, setCurrentScreen] = useState<'home' | 'setup' | 'active' | 'gameover'>('home');
+  const [currentScreen, setCurrentScreen] = useState<'home' | 'setup' | 'active' | 'gameover' | 'stats'>('home');
 
   const setGameId = (id: string | null) => {
     setGameIdState(id);

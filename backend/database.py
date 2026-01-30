@@ -1,9 +1,10 @@
 import sqlite3
 import json
+import os
 from datetime import datetime
 from uuid import UUID
 
-DB_NAME = "scrabble.db"
+DB_NAME = os.environ.get("DB_NAME", "scrabble.db")
 
 def get_db_connection():
     conn = sqlite3.connect(DB_NAME)
@@ -26,9 +27,11 @@ def init_db():
     ''')
 
     # Games table
+    # Added 'name' column
     c.execute('''
         CREATE TABLE IF NOT EXISTS games (
             id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
             status TEXT NOT NULL,
             turn_duration INTEGER NOT NULL,
             current_turn_index INTEGER DEFAULT 0,

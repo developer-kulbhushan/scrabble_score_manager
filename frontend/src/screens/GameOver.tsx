@@ -39,6 +39,11 @@ export function GameOver() {
             <Trophy className="w-16 h-16 text-yellow-600 mx-auto" />
             <h2 className="text-3xl font-bold text-gray-800">Winner</h2>
             <p className="text-5xl font-bold text-yellow-600">{endGameData.winner}</p>
+             {sortedScores[0].players && (
+                <p className="text-lg text-yellow-700 font-medium">
+                  {sortedScores[0].players.join(', ')}
+                </p>
+             )}
             <p className="text-2xl font-semibold text-gray-700">
               {sortedScores[0].score} points
             </p>
@@ -84,6 +89,11 @@ export function GameOver() {
                       <p className="text-2xl font-bold text-gray-800">
                         {entry.team}
                       </p>
+                      {entry.players && (
+                          <p className="text-sm text-gray-700 font-medium">
+                              {entry.players.join(', ')}
+                          </p>
+                      )}
                       <p className="text-sm text-gray-600">
                         {index === 0 ? '1st Place' : index === 1 ? '2nd Place' : index === 2 ? '3rd Place' : `${index + 1}th Place`}
                       </p>

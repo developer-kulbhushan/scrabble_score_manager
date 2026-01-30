@@ -20,11 +20,8 @@ export interface GameTeam {
   id: string;
   name: string;
   score: number;
-  players: string[]; // List of player names (or objects if backend changed to return objects, let's check backend)
+  players: string[]; // List of player names
 }
-
-// Backend get_game_state returns players as [p['name'] for p in t['players']] -> List of strings.
-// So GameTeam players: string[] is correct for names.
 
 export interface CurrentTurn {
   turn_number: number;
@@ -94,6 +91,7 @@ export interface EndGameResponse {
   final_scores: Array<{
     team: string;
     score: number;
+    players: string[];
   }>;
   winner: string;
 }
@@ -105,11 +103,26 @@ export interface Player {
   created_at: string;
 }
 
+export interface PlayerStats {
+  player_id: string;
+  name: string;
+  number: string;
+  total_games: number;
+  wins: number;
+  win_rate: number;
+  avg_score: number;
+  high_score_solo: number;
+  high_score_duo: number;
+  high_score_trio: number;
+  high_score_group: number;
+}
+
 export interface HistoryEntry {
   game_id: string;
   name: string;
   ended_at: string;
   winner: string;
+  winner_players: string[];
   top_score: number;
   teams_count: number;
 }
@@ -174,6 +187,12 @@ export const api = {
       body: JSON.stringify({ name, number }),
     });
     if (!response.ok) throw new Error('Failed to register player');
+    return response.json();
+  },
+
+  async getPlayerStats(playerId: string): Promise<PlayerStats> {
+    const response = await fetch(`${API_BASE_URL}/stats/players/${playerId}`);
+    if (!response.ok) throw new Error('Failed to fetch player stats');
     return response.json();
   },
 

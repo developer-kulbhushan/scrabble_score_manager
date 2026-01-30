@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Play, UserPlus, Trophy, History } from 'lucide-react';
+import { Play, UserPlus, Trophy, History, BarChart2 } from 'lucide-react';
 import { Card } from '../components/Card';
 import { api, HistoryEntry, Player } from '../utils/api';
 import { useGame } from '../context/GameContext';
@@ -38,7 +38,7 @@ export function Home() {
           <p className="text-xl text-gray-600">Track scores, analyze history, and manage players.</p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <Card className="p-8 flex flex-col items-center justify-center text-center hover:shadow-lg transition-shadow cursor-pointer border-2 border-transparent hover:border-blue-100" onClick={() => setCurrentScreen('setup')}>
             <div className="bg-blue-100 p-4 rounded-full mb-4">
               <Play className="w-8 h-8 text-blue-600 ml-1" />
@@ -53,6 +53,14 @@ export function Home() {
             </div>
             <h2 className="text-2xl font-bold text-gray-800 mb-2">Register Player</h2>
             <p className="text-gray-500">Add new players to the roster</p>
+          </Card>
+
+          <Card className="p-8 flex flex-col items-center justify-center text-center hover:shadow-lg transition-shadow cursor-pointer border-2 border-transparent hover:border-purple-100" onClick={() => setCurrentScreen('stats')}>
+            <div className="bg-purple-100 p-4 rounded-full mb-4">
+              <BarChart2 className="w-8 h-8 text-purple-600" />
+            </div>
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">Player Stats</h2>
+            <p className="text-gray-500">View individual performance & comparisons</p>
           </Card>
         </div>
 
@@ -114,8 +122,13 @@ export function Home() {
                 </div>
                 <div className="text-right">
                   <p className="text-sm text-gray-500">Winner</p>
-                  <p className="font-bold text-green-600">{game.winner}</p>
-                  <p className="text-xs text-gray-400">{game.top_score} pts</p>
+                  <div className="flex flex-col items-end">
+                      <p className="font-bold text-green-600">{game.winner}</p>
+                      {game.winner_players && game.winner_players.length > 0 && (
+                          <p className="text-xs text-gray-500">{game.winner_players.join(', ')}</p>
+                      )}
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">{game.top_score} pts</p>
                 </div>
               </Card>
             ))}
