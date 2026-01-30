@@ -2,7 +2,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 export interface Team {
   name: string;
-  players: string[];
+  players: string[]; // List of Player IDs
 }
 
 export interface CreateGameRequest {
@@ -20,8 +20,11 @@ export interface GameTeam {
   id: string;
   name: string;
   score: number;
-  players: string[];
+  players: string[]; // List of player names (or objects if backend changed to return objects, let's check backend)
 }
+
+// Backend get_game_state returns players as [p['name'] for p in t['players']] -> List of strings.
+// So GameTeam players: string[] is correct for names.
 
 export interface CurrentTurn {
   turn_number: number;
@@ -95,6 +98,22 @@ export interface EndGameResponse {
   winner: string;
 }
 
+export interface Player {
+  id: string;
+  name: string;
+  number: string;
+  created_at: string;
+}
+
+export interface HistoryEntry {
+  game_id: string;
+  name: string;
+  ended_at: string;
+  winner: string;
+  top_score: number;
+  teams_count: number;
+}
+
 export const api = {
   async createGame(data: CreateGameRequest): Promise<CreateGameResponse> {
     const response = await fetch(`${API_BASE_URL}/games`, {
@@ -135,6 +154,32 @@ export const api = {
       method: 'POST',
     });
     if (!response.ok) throw new Error('Failed to end game');
+    return response.json();
+  },
+
+  async getPlayers(query?: string): Promise<Player[]> {
+    const url = new URL(`${API_BASE_URL}/players`);
+    if (query) {
+      url.searchParams.append('query', query);
+    }
+    const response = await fetch(url.toString());
+    if (!response.ok) throw new Error('Failed to fetch players');
+    return response.json();
+  },
+
+  async registerPlayer(name: string, number: string): Promise<Player> {
+    const response = await fetch(`${API_BASE_URL}/players`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, number }),
+    });
+    if (!response.ok) throw new Error('Failed to register player');
+    return response.json();
+  },
+
+  async getHistory(): Promise<HistoryEntry[]> {
+    const response = await fetch(`${API_BASE_URL}/history`);
+    if (!response.ok) throw new Error('Failed to fetch history');
     return response.json();
   },
 };
