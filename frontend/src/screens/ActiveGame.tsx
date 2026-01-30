@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Trophy, Undo2, Timer, Star } from 'lucide-react';
+import { Trophy, Undo2, Timer, Star, Play, Pause } from 'lucide-react';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
 import { Card } from '../components/Card';
@@ -12,6 +12,7 @@ export function ActiveGame() {
   const [baseScore, setBaseScore] = useState('');
   const [bingo, setBingo] = useState(false);
   const [timeLeft, setTimeLeft] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
   const [showScoreboard, setShowScoreboard] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -25,6 +26,7 @@ export function ActiveGame() {
   useEffect(() => {
     if (gameState?.current_turn) {
       setTimeLeft(gameState.current_turn.time_left);
+      setIsPaused(false);
     }
   }, [gameState]);
 
@@ -46,13 +48,13 @@ export function ActiveGame() {
   }, [timeLeft]);
 
   useEffect(() => {
-    if (timeLeft > 0) {
+    if (timeLeft > 0 && !isPaused) {
       const timer = setInterval(() => {
         setTimeLeft((prev) => Math.max(0, prev - 1));
       }, 1000);
       return () => clearInterval(timer);
     }
-  }, [timeLeft]);
+  }, [timeLeft, isPaused]);
 
   const loadGameState = async () => {
     if (!gameId) return;
@@ -94,6 +96,7 @@ export function ActiveGame() {
       setBaseScore('');
       setBingo(false);
       setTimeLeft(gameState?.turn_duration || 0);
+      setIsPaused(false);
     } catch (err) {
       setError('Failed to submit turn');
     } finally {
@@ -126,6 +129,7 @@ export function ActiveGame() {
       );
 
       setTimeLeft(gameState?.turn_duration || 0);
+      setIsPaused(false);
     } catch (err) {
       setError('Failed to undo turn');
     } finally {
@@ -264,6 +268,19 @@ export function ActiveGame() {
               {formatTime(timeLeft)}
             </div>
           </div>
+
+          <div className="flex justify-center mb-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setIsPaused(!isPaused)}
+              className="flex items-center gap-2"
+            >
+              {isPaused ? <Play className="w-4 h-4" /> : <Pause className="w-4 h-4" />}
+              {isPaused ? "Resume" : "Pause"}
+            </Button>
+          </div>
+
           {timeLeft <= 0 && (
             <p className="text-red-600 font-semibold animate-pulse">Time's Up!</p>
           )}
@@ -275,7 +292,7 @@ export function ActiveGame() {
             <h2 className="text-3xl font-bold text-gray-800">{currentTeam?.name}</h2>
           </div>
           <p className="text-xl text-gray-600">
-            {gameState.current_turn.player}
+            {currentTeam?.players.join(', ')}
           </p>
           <p className="text-sm text-gray-500">
             Turn {gameState.current_turn.turn_number}
