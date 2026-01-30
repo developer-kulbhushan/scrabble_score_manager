@@ -2,7 +2,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 export interface Team {
   name: string;
-  players: string[];
+  players: string[]; // List of Player IDs
 }
 
 export interface CreateGameRequest {
@@ -20,7 +20,7 @@ export interface GameTeam {
   id: string;
   name: string;
   score: number;
-  players: string[];
+  players: string[]; // List of player names
 }
 
 export interface CurrentTurn {
@@ -91,8 +91,40 @@ export interface EndGameResponse {
   final_scores: Array<{
     team: string;
     score: number;
+    players: string[];
   }>;
   winner: string;
+}
+
+export interface Player {
+  id: string;
+  name: string;
+  number: string;
+  created_at: string;
+}
+
+export interface PlayerStats {
+  player_id: string;
+  name: string;
+  number: string;
+  total_games: number;
+  wins: number;
+  win_rate: number;
+  avg_score: number;
+  high_score_solo: number;
+  high_score_duo: number;
+  high_score_trio: number;
+  high_score_group: number;
+}
+
+export interface HistoryEntry {
+  game_id: string;
+  name: string;
+  ended_at: string;
+  winner: string;
+  winner_players: string[];
+  top_score: number;
+  teams_count: number;
 }
 
 export const api = {
@@ -135,6 +167,38 @@ export const api = {
       method: 'POST',
     });
     if (!response.ok) throw new Error('Failed to end game');
+    return response.json();
+  },
+
+  async getPlayers(query?: string): Promise<Player[]> {
+    const url = new URL(`${API_BASE_URL}/players`);
+    if (query) {
+      url.searchParams.append('query', query);
+    }
+    const response = await fetch(url.toString());
+    if (!response.ok) throw new Error('Failed to fetch players');
+    return response.json();
+  },
+
+  async registerPlayer(name: string, number: string): Promise<Player> {
+    const response = await fetch(`${API_BASE_URL}/players`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, number }),
+    });
+    if (!response.ok) throw new Error('Failed to register player');
+    return response.json();
+  },
+
+  async getPlayerStats(playerId: string): Promise<PlayerStats> {
+    const response = await fetch(`${API_BASE_URL}/stats/players/${playerId}`);
+    if (!response.ok) throw new Error('Failed to fetch player stats');
+    return response.json();
+  },
+
+  async getHistory(): Promise<HistoryEntry[]> {
+    const response = await fetch(`${API_BASE_URL}/history`);
+    if (!response.ok) throw new Error('Failed to fetch history');
     return response.json();
   },
 };

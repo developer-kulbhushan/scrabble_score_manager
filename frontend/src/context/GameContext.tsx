@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, ReactNode } from 'react';
+import { createContext, useContext, useState, ReactNode, Dispatch, SetStateAction } from 'react';
 import { GameState, EndGameResponse } from '../utils/api';
 
 interface GameContextType {
@@ -6,10 +6,10 @@ interface GameContextType {
   gameState: GameState | null;
   endGameData: EndGameResponse | null;
   setGameId: (id: string | null) => void;
-  setGameState: (state: GameState | null) => void;
+  setGameState: Dispatch<SetStateAction<GameState | null>>;
   setEndGameData: (data: EndGameResponse | null) => void;
-  currentScreen: 'setup' | 'active' | 'gameover';
-  setCurrentScreen: (screen: 'setup' | 'active' | 'gameover') => void;
+  currentScreen: 'home' | 'setup' | 'active' | 'gameover' | 'stats';
+  setCurrentScreen: (screen: 'home' | 'setup' | 'active' | 'gameover' | 'stats') => void;
 }
 
 const GameContext = createContext<GameContextType | undefined>(undefined);
@@ -20,7 +20,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
   });
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [endGameData, setEndGameData] = useState<EndGameResponse | null>(null);
-  const [currentScreen, setCurrentScreen] = useState<'setup' | 'active' | 'gameover'>('setup');
+  const [currentScreen, setCurrentScreen] = useState<'home' | 'setup' | 'active' | 'gameover' | 'stats'>('home');
 
   const setGameId = (id: string | null) => {
     setGameIdState(id);

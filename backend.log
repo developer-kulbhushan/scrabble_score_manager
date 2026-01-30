@@ -1,0 +1,11 @@
+INFO:     Started server process [21433]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+INFO:     127.0.0.1:34962 - "GET /history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49552 - "GET /history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49556 - "GET /history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45912 - "GET /history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45914 - "GET /history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45914 - "GET /history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45912 - "GET /history HTTP/1.1" 200 OK
